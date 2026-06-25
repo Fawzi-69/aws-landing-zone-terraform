@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and adjust. The bucket name must be globally unique.
+state_bucket_name = "acme-landing-zone-tfstate-eu-west-3"
+lock_table_name   = "terraform-state-lock"
+region            = "eu-west-3"
+project           = "aws-landing-zone"
+owner             = "platform-team"
