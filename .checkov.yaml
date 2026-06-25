@@ -1,0 +1,19 @@
+# Checkov configuration — static security/compliance scanning.
+# Run with: checkov -d . (or `make scan`).
+framework:
+  - terraform
+compact: true
+quiet: true
+download-external-modules: false
+
+# Directories without deployable resources (examples only).
+skip-path:
+  - ".*\\.terraform.*"
+
+# Global skips — each entry MUST carry a justification.
+skip-check:
+  # CKV_AWS_18  : S3 access logging — the log-archive bucket is itself the
+  #               central logging target; enabling access logging on it would
+  #               create a recursive logging loop. Handled per-bucket instead.
+  - "CKV_AWS_144" # S3 cross-region replication — single-region (eu-west-3) by
+                  # design for this landing zone; DR is out of scope.

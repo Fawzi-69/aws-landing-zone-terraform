@@ -1,0 +1,21 @@
+# Partial backend configuration template.
+#
+# Copy this file into the root you want to initialise, e.g.:
+#   cp backend.hcl.example environments/dev/backend.hcl
+# then adjust the values and run:
+#   make init ENV=dev      (or: terraform -chdir=environments/dev init -backend-config=backend.hcl)
+#
+# Values come from the `bootstrap/` outputs. Never commit a real backend.hcl
+# (it is git-ignored) — only this example with placeholders lives in the repo.
+
+bucket         = "REPLACE-tfstate-bucket-name"
+dynamodb_table = "REPLACE-tfstate-lock-table"
+region         = "eu-west-3"
+encrypt        = true
+kms_key_id     = "REPLACE-kms-key-arn"
+
+# `key` is set per root (do not put it here):
+#   bootstrap/            -> not applicable (local state, bootstraps the backend)
+#   global/               -> key = "global/terraform.tfstate"
+#   environments/dev/     -> key = "environments/dev/terraform.tfstate"
+#   environments/prod/    -> key = "environments/prod/terraform.tfstate"

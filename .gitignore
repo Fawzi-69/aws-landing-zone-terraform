@@ -1,0 +1,24 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Variable files & backend config (may contain account-specific values)
+*.tfvars
+*.tfvars.json
+backend.hcl
+!*.tfvars.example
+
+# Plan artifacts
+*.tfplan
+plan.out
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
