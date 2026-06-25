@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and fill in. account_id is the workloads-prod account
+# id from `terraform -chdir=../../global output account_ids`.
+
+account_id          = "222222222222"
+region              = "eu-west-3"
+vpc_cidr            = "10.20.0.0/16"
+single_nat_gateway  = false
+budget_amount       = 500
+notification_emails = ["prod-oncall@example.com"]

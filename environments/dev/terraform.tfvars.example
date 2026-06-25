@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and fill in. account_id is the workloads-dev account
+# id from `terraform -chdir=../../global output account_ids`.
+
+account_id          = "111111111111"
+region              = "eu-west-3"
+vpc_cidr            = "10.10.0.0/16"
+single_nat_gateway  = true
+budget_amount       = 100
+notification_emails = ["dev-team@example.com"]
