@@ -1,0 +1,139 @@
+name: terraform
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Keyless auth to AWS via OIDC (see modules/github-oidc).
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  TF_VERSION: "1.14.3"
+  AWS_REGION: "eu-west-3"
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Static quality gate: format, offline validate, lint, security scan.
+  # Runs on every PR and push. No AWS credentials required.
+  # ---------------------------------------------------------------------------
+  static:
+    name: fmt / validate / tflint / checkov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: terraform validate (offline, every root)
+        run: |
+          set -e
+          for dir in bootstrap global environments/dev environments/prod; do
+            echo "::group::validate $dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate -no-color
+            echo "::endgroup::"
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --recursive -f compact
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          config_file: .checkov.yaml
+          quiet: true
+
+  # ---------------------------------------------------------------------------
+  # Plan on pull requests. One job per root; comments the plan back on the PR.
+  # ---------------------------------------------------------------------------
+  plan:
+    name: plan (${{ matrix.dir }})
+    if: github.event_name == 'pull_request'
+    needs: static
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [global, environments/dev, environments/prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        run: |
+          terraform -chdir="${{ matrix.dir }}" init -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="kms_key_id=${{ secrets.TF_STATE_KMS_KEY }}"
+
+      - name: terraform plan
+        run: terraform -chdir="${{ matrix.dir }}" plan -input=false -no-color
+
+  # ---------------------------------------------------------------------------
+  # Apply on merge to main. One job per root.
+  # ---------------------------------------------------------------------------
+  apply:
+    name: apply (${{ matrix.dir }})
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: static
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        dir: [global, environments/dev, environments/prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: terraform init
+        run: |
+          terraform -chdir="${{ matrix.dir }}" init -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="kms_key_id=${{ secrets.TF_STATE_KMS_KEY }}"
+
+      - name: terraform apply
+        run: terraform -chdir="${{ matrix.dir }}" apply -input=false -auto-approve
