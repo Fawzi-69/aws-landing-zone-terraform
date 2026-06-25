@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in. Account emails must be unique mailboxes
+# (distribution lists recommended) and the CloudTrail bucket name must be
+# globally unique.
+
+account_emails = {
+  log_archive     = "aws+log-archive@example.com"
+  security        = "aws+security@example.com"
+  shared_services = "aws+shared-services@example.com"
+  workloads_dev   = "aws+workloads-dev@example.com"
+  workloads_prod  = "aws+workloads-prod@example.com"
+}
+
+cloudtrail_bucket_name = "acme-org-cloudtrail-eu-west-3"
+
+github_org  = "acme"
+github_repo = "aws-landing-zone-terraform"
+
+region                      = "eu-west-3"
+region_lock_allowed_regions = ["eu-west-3", "eu-west-1"]
+
+org_budget_amount          = 1000
+finops_notification_emails = ["finops@example.com"]
