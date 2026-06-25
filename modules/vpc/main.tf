@@ -136,7 +136,7 @@ resource "aws_route_table_association" "private_data" {
   route_table_id = aws_route_table.private_data.id
 }
 
-# --- Data-tier NACL: only the app tier may reach it ---------------------------
+# --- Data-tier NACL: only the app tier may reach it, only on data ports -------
 
 resource "aws_network_acl" "data" {
   vpc_id     = aws_vpc.this.id
@@ -144,26 +144,46 @@ resource "aws_network_acl" "data" {
   tags       = merge(var.tags, { Name = "${var.name}-data" })
 }
 
-resource "aws_network_acl_rule" "data_ingress_from_app" {
-  count = length(var.private_app_subnet_cidrs)
-
-  network_acl_id = aws_network_acl.data.id
-  rule_number    = 100 + count.index
-  egress         = false
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = var.private_app_subnet_cidrs[count.index]
+locals {
+  # One ingress rule per (app subnet, data port). Rule numbers stay unique and
+  # well below the 32766 ceiling.
+  data_nacl_ingress = flatten([
+    for ci, cidr in var.private_app_subnet_cidrs : [
+      for pi, port in var.data_tier_ingress_ports : {
+        key         = "${ci}-${pi}"
+        rule_number = 100 + ci * 100 + pi
+        cidr        = cidr
+        port        = port
+      }
+    ]
+  ])
 }
 
-resource "aws_network_acl_rule" "data_egress_to_app" {
+resource "aws_network_acl_rule" "data_ingress" {
+  for_each = { for r in local.data_nacl_ingress : r.key => r }
+
+  network_acl_id = aws_network_acl.data.id
+  rule_number    = each.value.rule_number
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = each.value.cidr
+  from_port      = each.value.port
+  to_port        = each.value.port
+}
+
+# Stateless NACLs need an explicit return path: ephemeral ports back to the app tier.
+resource "aws_network_acl_rule" "data_egress_ephemeral" {
   count = length(var.private_app_subnet_cidrs)
 
   network_acl_id = aws_network_acl.data.id
   rule_number    = 100 + count.index
   egress         = true
-  protocol       = "-1"
+  protocol       = "tcp"
   rule_action    = "allow"
   cidr_block     = var.private_app_subnet_cidrs[count.index]
+  from_port      = 1024
+  to_port        = 65535
 }
 
 # --- Lock down the default security group -------------------------------------

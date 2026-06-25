@@ -40,6 +40,12 @@ variable "single_nat_gateway" {
   default     = true
 }
 
+variable "data_tier_ingress_ports" {
+  description = "TCP ports the data tier accepts from the application tier (e.g. database engines)."
+  type        = list(number)
+  default     = [5432, 3306, 6379, 1433, 27017]
+}
+
 variable "enable_flow_logs" {
   description = "Capture VPC flow logs to an encrypted CloudWatch log group."
   type        = bool
