@@ -14,8 +14,8 @@ output "account_ids" {
 }
 
 output "cloudtrail_bucket_arn" {
-  description = "ARN of the central CloudTrail bucket."
-  value       = module.cloudtrail.bucket_arn
+  description = "ARN of the central CloudTrail bucket (null until phase 2)."
+  value       = try(module.cloudtrail[0].bucket_arn, null)
 }
 
 output "identity_center_permission_set_arns" {

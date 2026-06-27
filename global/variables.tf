@@ -38,6 +38,24 @@ variable "cloudtrail_bucket_name" {
   type        = string
 }
 
+variable "log_archive_account_id" {
+  description = "Account id of the log-archive account, supplied after phase-1 account creation. Leave empty during phase 1."
+  type        = string
+  default     = ""
+}
+
+variable "security_account_id" {
+  description = "Account id of the security account (delegated admin for detective controls). Leave empty during phase 1."
+  type        = string
+  default     = ""
+}
+
+variable "enable_cross_account_baseline" {
+  description = "Phase 2 switch: provision cross-account resources (org CloudTrail, detective controls). Requires the *_account_id variables to be set."
+  type        = bool
+  default     = false
+}
+
 variable "region_lock_allowed_regions" {
   description = "Regions permitted by the region-lock SCP on workloads/infrastructure."
   type        = list(string)

@@ -87,6 +87,7 @@ module "scp_suspended" {
 
 module "cloudtrail" {
   source = "../modules/cloudtrail-org"
+  count  = var.enable_cross_account_baseline ? 1 : 0
   providers = {
     aws.management  = aws
     aws.log_archive = aws.log_archive
@@ -94,9 +95,22 @@ module "cloudtrail" {
 
   organization_id        = module.organization.organization_id
   management_account_id  = data.aws_caller_identity.management.account_id
-  log_archive_account_id = module.organization.account_ids["log-archive"]
+  log_archive_account_id = var.log_archive_account_id
   region                 = var.region
   bucket_name            = var.cloudtrail_bucket_name
+
+  tags = local.default_tags
+}
+
+# --- Organization detective controls (phase 2) -------------------------------
+
+module "security_baseline" {
+  source = "../modules/security-baseline"
+  count  = var.enable_cross_account_baseline ? 1 : 0
+  providers = {
+    aws.management = aws
+    aws.security   = aws.security
+  }
 
   tags = local.default_tags
 }

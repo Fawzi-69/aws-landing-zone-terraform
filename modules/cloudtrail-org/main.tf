@@ -208,11 +208,64 @@ resource "aws_s3_bucket_policy" "trail" {
 # Management account: CloudWatch log group + role + the trail itself
 # =============================================================================
 
+# The CloudWatch log group lives in the management account, so it needs a KMS
+# key in THAT account — the log-archive key (above) only encrypts the S3 trail
+# and does not grant the management account's CloudWatch Logs service.
+data "aws_iam_policy_document" "trail_cw_kms" {
+  # checkov:skip=CKV_AWS_109:KMS key policy resource is implicitly this key; root admin avoids lockout.
+  # checkov:skip=CKV_AWS_111:Root-account admin on the key is the AWS-recommended baseline.
+  # checkov:skip=CKV_AWS_356:"*" in a KMS key policy refers only to this key.
+  statement {
+    sid       = "EnableIamUserPermissions"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${var.management_account_id}:root"]
+    }
+  }
+
+  statement {
+    sid    = "AllowCloudWatchLogs"
+    effect = "Allow"
+    actions = [
+      "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*",
+      "kms:GenerateDataKey*", "kms:DescribeKey",
+    ]
+    resources = ["*"]
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.region}.amazonaws.com"]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = ["arn:aws:logs:${var.region}:${var.management_account_id}:log-group:*"]
+    }
+  }
+}
+
+resource "aws_kms_key" "trail_cw" {
+  provider                = aws.management
+  description             = "Encrypts the CloudTrail CloudWatch log group (management account)."
+  deletion_window_in_days = var.kms_key_deletion_window
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.trail_cw_kms.json
+  tags                    = var.tags
+}
+
+resource "aws_kms_alias" "trail_cw" {
+  provider      = aws.management
+  name          = "alias/org-cloudtrail-logs"
+  target_key_id = aws_kms_key.trail_cw.key_id
+}
+
 resource "aws_cloudwatch_log_group" "trail" {
   provider          = aws.management
   name              = "/aws/cloudtrail/${var.trail_name}"
   retention_in_days = var.log_retention_days
-  kms_key_id        = aws_kms_key.trail.arn
+  kms_key_id        = aws_kms_key.trail_cw.arn
   tags              = var.tags
 }
 
