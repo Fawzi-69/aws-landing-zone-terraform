@@ -168,13 +168,54 @@ data "aws_iam_policy_document" "deploy" {
   }
 }
 
-module "github_oidc" {
+# Read-only role for PR plans. Pull requests (including from forks) can run
+# `terraform plan`, which can execute code via data sources — so this role gets
+# ReadOnlyAccess plus just enough to decrypt remote state, and nothing that can
+# mutate the org.
+data "aws_iam_policy_document" "plan_state" {
+  # checkov:skip=CKV_AWS_111:kms:Decrypt on the state key is read-only; the key is created elsewhere so its ARN is not known here.
+  # checkov:skip=CKV_AWS_356:Resource "*" scoped by the action set (decrypt only) and by the read-only role it attaches to.
+  statement {
+    sid       = "DecryptRemoteState"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+  }
+}
+
+module "github_oidc_plan" {
   source = "../modules/github-oidc"
 
   github_org  = var.github_org
   github_repo = var.github_repo
 
+  role_name           = "github-actions-plan"
+  allowed_branches    = ["main"]
+  allow_pull_requests = true # PRs may plan, but only read-only.
+
+  permissions_policy_arns = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+  inline_policy           = data.aws_iam_policy_document.plan_state.json
+
+  create_oidc_provider = true
+
+  tags = local.default_tags
+}
+
+# Privileged apply role. Restricted to pushes on main — never assumable from a
+# pull request — and reuses the OIDC provider created above.
+module "github_oidc_apply" {
+  source = "../modules/github-oidc"
+
+  github_org  = var.github_org
+  github_repo = var.github_repo
+
+  role_name           = "github-actions-apply"
+  allowed_branches    = ["main"]
+  allow_pull_requests = false
+
   inline_policy = data.aws_iam_policy_document.deploy.json
+
+  create_oidc_provider = false
 
   tags = local.default_tags
 }

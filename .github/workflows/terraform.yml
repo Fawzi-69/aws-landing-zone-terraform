@@ -86,7 +86,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: terraform init
@@ -97,8 +97,9 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="kms_key_id=${{ secrets.TF_STATE_KMS_KEY }}"
 
+      # Read-only role -> plan without taking a state lock (no DynamoDB writes).
       - name: terraform plan
-        run: terraform -chdir="${{ matrix.dir }}" plan -input=false -no-color
+        run: terraform -chdir="${{ matrix.dir }}" plan -input=false -no-color -lock=false
 
   # ---------------------------------------------------------------------------
   # Apply on merge to main. One job per root.
@@ -124,7 +125,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_APPLY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: terraform init

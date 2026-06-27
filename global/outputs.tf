@@ -23,9 +23,14 @@ output "identity_center_permission_set_arns" {
   value       = module.identity_center.permission_set_arns
 }
 
-output "github_deploy_role_arn" {
-  description = "ARN of the GitHub Actions deploy role (set as the AWS_ROLE_ARN CI secret)."
-  value       = module.github_oidc.role_arn
+output "github_plan_role_arn" {
+  description = "ARN of the read-only GitHub Actions plan role (CI secret AWS_PLAN_ROLE_ARN)."
+  value       = module.github_oidc_plan.role_arn
+}
+
+output "github_apply_role_arn" {
+  description = "ARN of the privileged GitHub Actions apply role (CI secret AWS_APPLY_ROLE_ARN)."
+  value       = module.github_oidc_apply.role_arn
 }
 
 output "finops_sns_topic_arn" {
