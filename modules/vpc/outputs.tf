@@ -37,3 +37,13 @@ output "flow_log_id" {
   description = "Id of the VPC flow log (null when disabled)."
   value       = try(aws_flow_log.this[0].id, null)
 }
+
+output "gateway_endpoint_ids" {
+  description = "Ids of the S3/DynamoDB gateway endpoints."
+  value       = compact([try(aws_vpc_endpoint.s3[0].id, ""), try(aws_vpc_endpoint.dynamodb[0].id, "")])
+}
+
+output "interface_endpoint_ids" {
+  description = "Map of interface endpoint service name to id."
+  value       = { for k, e in aws_vpc_endpoint.interface : k => e.id }
+}

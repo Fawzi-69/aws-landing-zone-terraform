@@ -186,6 +186,80 @@ resource "aws_network_acl_rule" "data_egress_ephemeral" {
   to_port        = 65535
 }
 
+# --- VPC endpoints ------------------------------------------------------------
+# Gateway endpoints (S3, DynamoDB) keep S3/DynamoDB traffic on the AWS backbone
+# and, crucially, give the isolated data tier — which has no internet route — a
+# path to those services. Interface endpoints do the same for control-plane APIs
+# like SSM (so instances stay patchable/manageable without a NAT path).
+
+locals {
+  gateway_endpoint_route_table_ids = concat(
+    aws_route_table.private_app[*].id,
+    [aws_route_table.private_data.id],
+  )
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  count = var.enable_gateway_endpoints ? 1 : 0
+
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = local.gateway_endpoint_route_table_ids
+
+  tags = merge(var.tags, { Name = "${var.name}-s3" })
+}
+
+resource "aws_vpc_endpoint" "dynamodb" {
+  count = var.enable_gateway_endpoints ? 1 : 0
+
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.dynamodb"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = local.gateway_endpoint_route_table_ids
+
+  tags = merge(var.tags, { Name = "${var.name}-dynamodb" })
+}
+
+resource "aws_security_group" "endpoints" {
+  count = var.enable_interface_endpoints ? 1 : 0
+
+  # checkov:skip=CKV2_AWS_5:Attached to the interface VPC endpoints below via security_group_ids; checkov's graph doesn't follow the count-indexed reference.
+  name_prefix = "${var.name}-vpce-"
+  description = "Allows HTTPS from within the VPC to interface endpoints."
+  vpc_id      = aws_vpc.this.id
+
+  ingress {
+    description = "HTTPS from within the VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.this.cidr_block]
+  }
+
+  # Stateful SG: inbound 443 is answered without an explicit egress rule, so no
+  # egress is granted (default-deny outbound).
+
+  tags = merge(var.tags, { Name = "${var.name}-vpce" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_endpoint" "interface" {
+  for_each = var.enable_interface_endpoints ? toset(var.interface_endpoint_services) : []
+
+  vpc_id              = aws_vpc.this.id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.${each.value}"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private_app[*].id
+  security_group_ids  = [aws_security_group.endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = merge(var.tags, { Name = "${var.name}-${each.value}" })
+}
+
 # --- Lock down the default security group -------------------------------------
 
 resource "aws_default_security_group" "this" {

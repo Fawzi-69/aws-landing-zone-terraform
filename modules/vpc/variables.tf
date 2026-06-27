@@ -46,6 +46,24 @@ variable "data_tier_ingress_ports" {
   default     = [5432, 3306, 6379, 1433, 27017]
 }
 
+variable "enable_gateway_endpoints" {
+  description = "Create S3 and DynamoDB gateway VPC endpoints (free) for the private tiers."
+  type        = bool
+  default     = true
+}
+
+variable "enable_interface_endpoints" {
+  description = "Create interface VPC endpoints so private/isolated instances can reach AWS APIs without internet."
+  type        = bool
+  default     = true
+}
+
+variable "interface_endpoint_services" {
+  description = "Short service names for interface endpoints (e.g. ssm, ssmmessages, ec2messages)."
+  type        = list(string)
+  default     = ["ssm", "ssmmessages", "ec2messages"]
+}
+
 variable "enable_flow_logs" {
   description = "Capture VPC flow logs to an encrypted CloudWatch log group."
   type        = bool
