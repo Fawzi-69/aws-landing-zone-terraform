@@ -48,6 +48,24 @@ variable "enable_log_file_validation" {
   default     = true
 }
 
+variable "enable_object_lock" {
+  description = "Enable S3 Object Lock (WORM) on the audit bucket to make logs tamper-proof."
+  type        = bool
+  default     = true
+}
+
+variable "object_lock_mode" {
+  description = "Object Lock retention mode: GOVERNANCE (privileged users can override) or COMPLIANCE (no one can)."
+  type        = string
+  default     = "GOVERNANCE"
+}
+
+variable "object_lock_retention_days" {
+  description = "Default Object Lock retention period in days."
+  type        = number
+  default     = 365
+}
+
 variable "tags" {
   description = "Tags applied to taggable resources."
   type        = map(string)

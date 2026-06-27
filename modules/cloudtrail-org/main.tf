@@ -70,10 +70,29 @@ resource "aws_s3_bucket" "trail" {
   bucket        = var.bucket_name
   force_destroy = false
 
+  # WORM: must be declared at bucket creation. Combined with versioning, this
+  # makes delivered audit logs tamper-proof for the retention period.
+  object_lock_enabled = var.enable_object_lock
+
   # checkov:skip=CKV_AWS_18:This is the central audit-log bucket; adding S3 access
   # logging would require a second log bucket that also needs logging (recursive).
   # checkov:skip=CKV2_AWS_62:No event-notification consumer for the audit bucket.
   tags = var.tags
+}
+
+resource "aws_s3_bucket_object_lock_configuration" "trail" {
+  count    = var.enable_object_lock ? 1 : 0
+  provider = aws.log_archive
+  bucket   = aws_s3_bucket.trail.id
+
+  rule {
+    default_retention {
+      mode = var.object_lock_mode
+      days = var.object_lock_retention_days
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.trail]
 }
 
 resource "aws_s3_bucket_versioning" "trail" {
