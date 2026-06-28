@@ -4,6 +4,12 @@ Opinionated, reusable foundations for onboarding new client accounts onto AWS:
 multi-account governance, network and security baselines, and least-privilege
 access — all as code, validated statically in CI.
 
+> **Status & limits.** This repository is **validated statically only** (`fmt`, `validate`,
+> `tflint`, `checkov`). It has **not yet been applied end-to-end against a live AWS Organization**;
+> `apply` is intentionally left to the operator and should first be exercised on a throwaway sandbox
+> org. Real environment values live in `terraform.tfvars` (gitignored) — copy the provided
+> `terraform.tfvars.example` before planning.
+
 ## 1. Objective
 
 Stand up a production-ready **AWS landing zone** that a service company can drop
